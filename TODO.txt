@@ -1,0 +1,11 @@
+Wymagania funkcjonalne:
+   + wszystkie pliki pomocnicze w folderze .fc tworzonym podczas inicjalizacji - init,
+
+   + init - wyliczenie sum kontrolnych dla każdego pliku (można zdefiniować rodzaj sumy),
+   + update - liczy nowe sumy kontrolne plików,
+   @ status (bazuje na update):
+      + pokazuje pliki których sumy zmieniły się,
+      + pokazuje nowe pliki,
+      + pokazuje usunięte pliki,
+      * pokazuje pliki o zmienionych nazwach lub duplikaty,
+   * add - liczy sumy kontrolne nowych plików.
