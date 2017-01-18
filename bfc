@@ -1,0 +1,169 @@
+#!/bin/bash
+
+#set -x
+
+algorithm="sha512sum"
+waitingTime="1s"
+
+dateTime () {
+    date +"%F_%H.%M.%S"
+}
+
+init () {
+    if [[ -d .bfc ]] ; then
+        echo "Repository already exists - do nothing"
+        exit 255
+    else
+        mkdir .bfc
+        numberOfFiles=$(find -type f | wc -l)
+        find -type f -exec $algorithm {} \; > .bfc/current.sum &
+        calculatingPid=$!
+        trap "kill -SIGINT $calculatingPid" SIGINT
+         
+        while [[ -d /proc/$calculatingPid ]] ; do
+            listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
+            echo -e -n "\033[1K\r"
+            echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
+            sleep $waitingTime
+        done
+        trap - SIGINT
+        listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
+        echo -e -n "\033[1K\r"
+        echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
+    fi
+}
+
+update () {
+    if [[ -d .bfc ]] ; then
+        cp .bfc/current.sum .bfc/$(dateTime).sum
+
+        numberOfFiles=$(find -type f | wc -l)
+        find -type f -exec $algorithm {} \; > .bfc/current.sum &
+        calculatingPid=$!
+        trap "kill -SIGINT $calculatingPid" SIGINT
+        
+        while [[ -d /proc/$calculatingPid ]] ; do
+            listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
+            echo -e -n "\033[1K\r"
+            echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
+            sleep $waitingTime
+        done
+        trap - SIGINT
+        listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
+        echo -e -n "\033[1K\r"
+        echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
+    else
+        echo "Repository does not exist - create them with the command: bfc init"
+        exit 255
+    fi
+}
+
+status () {
+
+    #set -x
+    
+    current=".bfc/current.sum"
+    penultimate=$(ls -1 .bfc/20*.sum | tail -1)
+
+    rm .bfc/*.srt .bfc/*.result .bfc/*.comm > /dev/null 2>&1
+    touch .bfc/{modified,new,deleted}.result
+
+    # delete common/same lines (it makes no sense to compare)
+    LC_ALL=C sort $current -o .bfc/current.srt
+    LC_ALL=C sort $penultimate -o .bfc/penultimate.srt
+    LC_ALL=C comm -2 -3 .bfc/current.srt .bfc/penultimate.srt > .bfc/current.comm
+    LC_ALL=C comm -1 -3 .bfc/current.srt .bfc/penultimate.srt > .bfc/penultimate.comm
+    
+    numberOfCurrentFiles=$(cat .bfc/current.comm | wc -l)
+    numberOfPenultimateFiles=$(cat .bfc/penultimate.comm | wc -l)
+
+    counter=0;
+    while read line ; do
+        ((counter++))
+        echo -e -n "\033[1K\r"
+        echo -n "Progress (modified and new): $counter / $numberOfCurrentFiles"
+
+        currentSum=${line%% *}
+        file=${line#* }
+        file=${file#\*}
+        penultimateLine=$(fgrep "$file" .bfc/penultimate.comm)
+        penultimateSum=${penultimateLine%% *}
+        
+        if [[ -n $penultimateSum && $currentSum != $penultimateSum ]] ; then
+            echo "Modified file: $file" >> .bfc/modified.result
+            echo "    * current     - $currentSum" >> .bfc/modified.result
+            echo "    * penultimate - $penultimateSum" >> .bfc/modified.result
+        elif [[ -z $penultimateSum ]] ; then
+            echo "New file: $file" >> .bfc/new.result
+            echo "    * current     - $currentSum" >> .bfc/new.result
+            echo "    * penultimate - $penultimateSum" >> .bfc/new.result
+        fi       
+    done < .bfc/current.comm
+    echo
+
+    counter=0;
+    while read line ; do
+        ((counter++))
+        echo -e -n "\033[1K\r"
+        echo -n "Progress (deleted): $counter / $numberOfPenultimateFiles"
+
+        penultimateSum=${line%% *}
+        file=${line#* }
+        file=${file#\*}
+        currentLine=$(fgrep "$file" .bfc/current.comm)
+        currentSum=${currentLine%% *}
+        
+        if [[ -z $currentSum ]] ; then
+            echo "Deleted file: $file" >> .bfc/deleted.result
+            echo "    * penultimate - $penultimateSum" >> .bfc/deleted.result
+            echo "    * current     - $currentSum" >> .bfc/deleted.result
+        fi       
+    done < .bfc/penultimate.comm
+    echo
+    
+    echo
+    echo "####################"
+    echo "###              ###"
+    echo "###   Modified   ###"
+    echo "###              ###"
+    echo "####################"
+    echo
+    cat .bfc/modified.result
+
+    echo
+    echo "####################"
+    echo "###              ###"
+    echo "###     New      ###"
+    echo "###              ###"
+    echo "####################"
+    echo
+    cat .bfc/new.result
+
+    echo
+    echo "####################"
+    echo "###              ###"
+    echo "###   Deleted    ###"
+    echo "###              ###"
+    echo "####################"
+    echo
+    cat .bfc/deleted.result
+}
+
+if [[ $1 == "init" ]] ; then
+    init
+elif [[ $1 == "update" ]] ; then
+    update
+elif [[ $1 == "status" ]] ; then
+    status
+else
+    echo -e "!!! Alpha Version\n"
+    echo "Program to detect changes in the files, for example in case of failure hard drive."
+    echo "Use:"
+    echo "   bfc init - create repository; count checksums for all files"
+    echo "   bfc update - recalculates the checksum for all files"
+    echo "   bfc status - show changes between \"init/penultimate update\" and \"last update\"; list modified, added and deleted files"
+fi
+
+# How to run function in find command? Example below:
+# export -f function_name
+# find -type f -exec bash -c 'functio_name "$1"' _ {} \;
