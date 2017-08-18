@@ -181,19 +181,71 @@ status () {
     cat .bfc/new.result
 }
 
+bfcless () {
+    for i in * ; do 
+        if ! [[ -d "$i"/.bfc ]] ; then
+           numberOfFiles=$(find "$i" -type f | wc -l) 
+           echo "$i ($numberOfFiles)"
+        fi 
+    done
+}
+
+updstat () {
+    echo
+    echo "########################"
+    echo "###                  ###"
+    echo "###   Last update    ###"
+    echo "###                  ###"
+    echo "########################"
+    echo
+    for i in * ; do 
+        if [[ -d "$i"/.bfc ]] ; then
+           penultimate=$(ls -1 "$i"/.bfc/20*.sum 2>/dev/null | tail -1)
+           if [[ -n $penultimate ]] ; then
+              lastUpdate=$(find "$penultimate" -printf "%TY-%Tm-%Td %TH:%TM") 
+              echo "   * $lastUpdate - $i"  
+           fi
+        fi 
+    done | sort -r
+
+    echo
+    echo "#########################"
+    echo "###                   ###"
+    echo "###   Never update    ###"
+    echo "###                   ###"
+    echo "#########################"
+    echo
+    for i in * ; do 
+        if [[ -d "$i"/.bfc ]] ; then
+           penultimate=$(ls -1 "$i"/.bfc/20*.sum 2>/dev/null | tail -1)
+           if [[ -z $penultimate ]] ; then
+              echo "   * $i"  
+           fi
+        fi 
+    done | sort -r
+
+}
+
+
 if [[ $1 == "init" ]] ; then
     init
 elif [[ $1 == "update" ]] ; then
     update
 elif [[ $1 == "status" ]] ; then
     status
+elif [[ $1 == "bfcless" ]] ; then
+    bfcless
+elif [[ $1 == "updstat" ]] ; then
+    updstat
 else
     echo -e "!!! Alpha Version\n"
     echo "Program to detect changes in the files, for example in case of failure hard drive."
     echo "Use:"
-    echo "   bfc init - create repository; count checksums for all files"
-    echo "   bfc update - recalculates the checksum for all files"
-    echo "   bfc status - show changes between \"init/penultimate update\" and \"last update\"; list modified, added and deleted files"
+    echo "   bfc init     - create repository; count checksums for all files"
+    echo "   bfc update   - recalculates the checksum for all files"
+    echo "   bfc status   - show changes between \"init/penultimate update\" and \"last update\"; list modified, added and deleted files"
+    echo "   bfc bfcless  - run on parent directory; show directories that not containt .bfc subdirectory"
+    echo "   bfc updstat  - run on parent; show last update date"
 fi
 
 # How to run function in find command? Example below:
