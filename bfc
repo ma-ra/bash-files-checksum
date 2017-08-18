@@ -18,7 +18,7 @@ init () {
         numberOfFiles=$(find -type f | wc -l)
         find -type f -exec $algorithm {} \; > .bfc/current.sum &
         calculatingPid=$!
-        trap "kill -SIGINT $calculatingPid" SIGINT
+        #trap "kill -SIGINT $calculatingPid" SIGINT
          
         while [[ -d /proc/$calculatingPid ]] ; do
             listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
@@ -26,7 +26,7 @@ init () {
             echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
             sleep $waitingTime
         done
-        trap - SIGINT
+        #trap - SIGINT
         listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
         echo -e -n "\033[1K\r"
         echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
@@ -40,7 +40,7 @@ update () {
         numberOfFiles=$(find -type f | wc -l)
         find -type f -exec $algorithm {} \; > .bfc/current.sum &
         calculatingPid=$!
-        trap "kill -SIGINT $calculatingPid" SIGINT
+        #trap "kill -SIGINT $calculatingPid" SIGINT
         
         while [[ -d /proc/$calculatingPid ]] ; do
             listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
@@ -48,7 +48,7 @@ update () {
             echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
             sleep $waitingTime
         done
-        trap - SIGINT
+        #trap - SIGINT
         listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
         echo -e -n "\033[1K\r"
         echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
@@ -149,12 +149,61 @@ status () {
     cat .bfc/deleted.result
 }
 
+bfcless () {
+    for i in * ; do 
+        if ! [[ -d "$i"/.bfc ]] ; then
+           numberOfFiles=$(find "$i" -type f | wc -l) 
+           echo "$i ($numberOfFiles)"
+        fi 
+    done
+}
+
+updstat () {
+    echo
+    echo "########################"
+    echo "###                  ###"
+    echo "###   Last update    ###"
+    echo "###                  ###"
+    echo "########################"
+    echo
+    for i in * ; do 
+        if [[ -d "$i"/.bfc ]] ; then
+           penultimate=$(ls -1 "$i"/.bfc/20*.sum 2>/dev/null | tail -1)
+           if [[ -n $penultimate ]] ; then
+              lastUpdate=$(find "$penultimate" -printf "%TY-%Tm-%Td %TH:%TM") 
+              echo "   * $lastUpdate - $i"  
+           fi
+        fi 
+    done | sort -r
+
+    echo
+    echo "#########################"
+    echo "###                   ###"
+    echo "###   Never update    ###"
+    echo "###                   ###"
+    echo "#########################"
+    echo
+    for i in * ; do 
+        if [[ -d "$i"/.bfc ]] ; then
+           penultimate=$(ls -1 "$i"/.bfc/20*.sum 2>/dev/null | tail -1)
+           if [[ -z $penultimate ]] ; then
+              echo "   * $i"  
+           fi
+        fi 
+    done | sort -r
+
+}
+
 if [[ $1 == "init" ]] ; then
     init
 elif [[ $1 == "update" ]] ; then
     update
 elif [[ $1 == "status" ]] ; then
     status
+elif [[ $1 == "bfcless" ]] ; then
+    bfcless
+elif [[ $1 == "updstat" ]] ; then
+    updstat
 else
     echo -e "!!! Alpha Version\n"
     echo "Program to detect changes in the files, for example in case of failure hard drive."
