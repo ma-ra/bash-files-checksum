@@ -18,7 +18,7 @@ init () {
         numberOfFiles=$(find -type f | wc -l)
         find -type f -exec $algorithm {} \; > .bfc/current.sum &
         calculatingPid=$!
-        #trap "kill -SIGINT $calculatingPid" SIGINT
+        trap "kill -SIGINT $calculatingPid" SIGINT
          
         while [[ -d /proc/$calculatingPid ]] ; do
             listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
@@ -26,7 +26,7 @@ init () {
             echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
             sleep $waitingTime
         done
-        #trap - SIGINT
+        trap - SIGINT
         listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
         echo -e -n "\033[1K\r"
         echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
@@ -40,7 +40,7 @@ update () {
         numberOfFiles=$(find -type f | wc -l)
         find -type f -exec $algorithm {} \; > .bfc/current.sum &
         calculatingPid=$!
-        #trap "kill -SIGINT $calculatingPid" SIGINT
+        trap "kill -SIGINT $calculatingPid" SIGINT
         
         while [[ -d /proc/$calculatingPid ]] ; do
             listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
@@ -48,7 +48,7 @@ update () {
             echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
             sleep $waitingTime
         done
-        #trap - SIGINT
+        trap - SIGINT
         listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
         echo -e -n "\033[1K\r"
         echo -n "Progress: $listOfCalculatedFiles / $numberOfFiles"
@@ -66,21 +66,23 @@ status () {
     penultimate=$(ls -1 .bfc/20*.sum | tail -1)
 
     rm .bfc/*.srt .bfc/*.result .bfc/*.comm > /dev/null 2>&1
-    touch .bfc/{modified,new,deleted}.result
+    touch .bfc/{modified,new,deleted,renamed}.result
 
     # delete bfc file from compare
     sed -i '/\/\.bfc\//d' $current
     sed -i '/\/\.bfc\//d' $penultimate
 
+    # prepare to find modify/new/deleted files
     # delete common/same lines (it makes no sense to compare)
     LC_ALL=C sort $current -o .bfc/current.srt
     LC_ALL=C sort $penultimate -o .bfc/penultimate.srt
     LC_ALL=C comm -2 -3 .bfc/current.srt .bfc/penultimate.srt > .bfc/current.comm
     LC_ALL=C comm -1 -3 .bfc/current.srt .bfc/penultimate.srt > .bfc/penultimate.comm
-    
+
     numberOfCurrentFiles=$(cat .bfc/current.comm | wc -l)
     numberOfPenultimateFiles=$(cat .bfc/penultimate.comm | wc -l)
 
+    # find modify/new files
     counter=0;
     while read line ; do
         ((counter++))
@@ -105,22 +107,43 @@ status () {
     done < .bfc/current.comm
     echo
 
+    # find deleted/renamed files
     counter=0;
     while read line ; do
         ((counter++))
         echo -e -n "\033[1K\r"
-        echo -n "Progress (deleted): $counter / $numberOfPenultimateFiles"
+        echo -n "Progress (deleted and renamed): $counter / $numberOfPenultimateFiles"
 
         penultimateSum=${line%% *}
         file=${line#* }
         file=${file#\*}
         currentLine=$(fgrep "$file" .bfc/current.comm)
         currentSum=${currentLine%% *}
-        
+        currentFile=${currentLine#* }
+        currentFile=${currentFile#\*}
+       
+        echo "0" > .bfc/stat 
         if [[ -z $currentSum ]] ; then
-            echo "Deleted file: $file" >> .bfc/deleted.result
-            echo "    * penultimate - $penultimateSum" >> .bfc/deleted.result
-            echo "    * current     - $currentSum" >> .bfc/deleted.result
+            fgrep "$penultimateSum" .bfc/current.comm | while read line2 ; do
+                currentSum=${line2%% *}
+                currentFile=${line2#* }
+                currentFile=${currentFile#\*}
+                if [[ $penultimateSum == $currentSum && $(cat .bfc/stat) -eq 0 ]] ; then
+                    echo "Renamed file for sum: $penultimateSum" >> .bfc/renamed.result
+                    echo "    * penultimate - $file" >> .bfc/renamed.result
+                    echo "    * current     - $currentFile" >> .bfc/renamed.result
+                    echo "1" > .bfc/stat
+                elif [[ $penultimateSum == $currentSum && $(cat .bfc/stat) -eq 1 ]] ; then
+                    echo "    * current     - $currentFile" >> .bfc/renamed.result
+                    echo "1" > .bfc/stat
+                fi
+            done
+            
+            if [[ $(cat .bfc/stat) -eq 0 ]] ; then
+                echo "Deleted file: $file" >> .bfc/deleted.result
+                echo "    * penultimate - $penultimateSum" >> .bfc/deleted.result
+                echo "    * current     - $currentSum" >> .bfc/deleted.result
+            fi
         fi       
     done < .bfc/penultimate.comm
     echo
@@ -137,20 +160,29 @@ status () {
     echo
     echo "####################"
     echo "###              ###"
-    echo "###     New      ###"
-    echo "###              ###"
-    echo "####################"
-    echo
-    cat .bfc/new.result
-
-    echo
-    echo "####################"
-    echo "###              ###"
     echo "###   Deleted    ###"
     echo "###              ###"
     echo "####################"
     echo
     cat .bfc/deleted.result
+    
+    echo
+    echo "####################"
+    echo "###              ###"
+    echo "###   Renamed    ###"
+    echo "###              ###"
+    echo "####################"
+    echo
+    cat .bfc/renamed.result
+
+    echo
+    echo "####################"
+    echo "###              ###"
+    echo "###     New      ###"
+    echo "###              ###"
+    echo "####################"
+    echo
+    cat .bfc/new.result
 }
 
 bfcless () {
