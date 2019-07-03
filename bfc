@@ -68,6 +68,10 @@ status () {
     rm .bfc/*.srt .bfc/*.result .bfc/*.comm > /dev/null 2>&1
     touch .bfc/{modified,new,deleted}.result
 
+    # delete bfc file from compare
+    sed -i '/\/\.bfc\//d' $current
+    sed -i '/\/\.bfc\//d' $penultimate
+
     # delete common/same lines (it makes no sense to compare)
     LC_ALL=C sort $current -o .bfc/current.srt
     LC_ALL=C sort $penultimate -o .bfc/penultimate.srt
@@ -211,6 +215,10 @@ else
     echo "   bfc init - create repository; count checksums for all files"
     echo "   bfc update - recalculates the checksum for all files"
     echo "   bfc status - show changes between \"init/penultimate update\" and \"last update\"; list modified, added and deleted files"
+    echo "   bfc bfcless - run on parent directory; show directory without .bfc subfolder" 
+    echo "   bfc updstat - run on parent directory; show last update"
+    echo "Example:"
+    echo '   update all - for i in * ; do bash -c "cd \"$i\" && bfc update" ; done'
 fi
 
 # How to run function in find command? Example below:
