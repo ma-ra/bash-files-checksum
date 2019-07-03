@@ -230,6 +230,15 @@ updstat () {
 
 }
 
+dup () {
+    if [[ $1 = "-files" ]] ; then
+        sort $2 $3 | uniq -w 130 --all-repeated=prepend | awk ' $1 == "" {print $0} $1 != "" {HASH=$1 ; $1="" ; print $0} '
+    else
+        sort */.bfc/current.sum $1 $2 | uniq -w 130 --all-repeated=prepend | awk ' $1 == "" {print $0} $1 != "" {HASH=$1 ; $1="" ; print $0} '
+    fi
+}
+
+
 if [[ $1 == "init" ]] ; then
     init
 elif [[ $1 == "update" ]] ; then
@@ -240,6 +249,8 @@ elif [[ $1 == "bfcless" ]] ; then
     bfcless
 elif [[ $1 == "updstat" ]] ; then
     updstat
+elif [[ $1 == "dup" ]] ; then
+    dup $2 $3 $4
 else
     echo -e "!!! Alpha Version\n"
     echo "Program to detect changes in the files, for example in case of failure hard drive."
@@ -249,6 +260,8 @@ else
     echo "   bfc status - show changes between \"init/penultimate update\" and \"last update\"; list modified, added and deleted files"
     echo "   bfc bfcless - run on parent directory; show directory without .bfc subfolder" 
     echo "   bfc updstat - run on parent directory; show last update"
+    echo "   bfc dup [current1.sum] [current2.sum] - run on parent directory; find duplicate files by hash"
+    echo "   bfc dup -files current1.sum current2.sum - run on selected files; find duplicate files by hash"
     echo "Example:"
     echo '   update all - for i in * ; do bash -c "cd \"$i\" && bfc update" ; done'
 fi
