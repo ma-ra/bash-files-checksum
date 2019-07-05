@@ -18,7 +18,8 @@ init () {
         numberOfFiles=$(find -type f | wc -l)
         find -type f -exec $algorithm {} \; > .bfc/current.sum &
         calculatingPid=$!
-        trap "kill -SIGINT $calculatingPid" SIGINT
+        #trap - to improve; blocks the loop break by ctrl + c
+        #trap "kill -SIGINT $calculatingPid" SIGINT
          
         while [[ -d /proc/$calculatingPid ]] ; do
             listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
@@ -40,7 +41,8 @@ update () {
         numberOfFiles=$(find -type f | wc -l)
         find -type f -exec $algorithm {} \; > .bfc/current.sum &
         calculatingPid=$!
-        trap "kill -SIGINT $calculatingPid" SIGINT
+        #trap - to improve; blocks the loop break by ctrl + c
+        #trap "kill -SIGINT $calculatingPid" SIGINT
         
         while [[ -d /proc/$calculatingPid ]] ; do
             listOfCalculatedFiles=$(cat .bfc/current.sum | wc -l)
@@ -263,7 +265,7 @@ else
     echo "   bfc dup [current1.sum] [current2.sum] - run on parent directory; find duplicate files by hash"
     echo "   bfc dup -files current1.sum current2.sum - run on selected files; find duplicate files by hash"
     echo "Example:"
-    echo '   update all - for i in * ; do bash -c "cd \"$i\" && bfc update" ; done'
+    echo '   update all - for i in * ; do echo -e "\n$i" ; bash -c "cd \"$i\" && bfc update" ; done'
 fi
 
 # How to run function in find command? Example below:
